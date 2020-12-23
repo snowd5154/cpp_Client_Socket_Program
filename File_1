@@ -1,0 +1,145 @@
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sstream>
+
+
+using namespace std;
+
+int main() {
+
+    int sockfd, n;
+    int portNumber = 0;
+    string thePortNumber;
+    struct sockaddr_in serverAddress;
+    struct hostent *server;
+    
+    string hostName;
+    char buffer[256];
+    
+    cout << "Enter server host name: ";
+    getline(cin, hostName);
+    cout << "Enter server port number: ";
+    getline(cin, thePortNumber);
+    
+    stringstream holdPortNumber(thePortNumber);
+    
+    holdPortNumber >> portNumber;
+    
+    string majorInformation = "begin";
+    
+    FILE * pFile;
+
+    while(1)
+    {
+        
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);  //create a stream socket
+        if(sockfd < 0)
+        {
+            perror("socket failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        const char * host = hostName.c_str();
+        
+        server = gethostbyname(host);//, hostName.size());
+        
+        if(server == NULL)
+        {
+            fprintf(stderr, "ERROR, no such host\n");
+            exit(0);
+            
+        }
+        
+        bzero((char *) &serverAddress, sizeof(serverAddress));
+        serverAddress.sin_family = AF_INET;
+        bcopy((char *) server->h_addr, (char *) &serverAddress.sin_addr.s_addr, server->h_length);
+        serverAddress.sin_port = htons(portNumber);
+        //serverAddress.sin_port = htons(tempPortNumber);
+
+        if(connect(sockfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
+        {
+            printf("Connection Failed \n");
+            return -1;
+        }
+        
+        cout << "Enter a college major: ";
+        getline(cin, majorInformation);
+        bzero(buffer, 256);
+        
+        
+        //copy our input into our buffer
+        strcpy(buffer, majorInformation.c_str());
+        
+
+        string temp(buffer);
+        if(temp == "")
+        {
+            //cout << "empty input so we should end" << endl;
+            break;
+            
+        }
+
+        //send our message to the server
+        n = write(sockfd, buffer, majorInformation.size());
+        if(n < 0)
+        {
+            cout << "ERROR writing to socket" << endl;
+        }
+        
+        bzero(buffer,256);
+        
+        //read the message we receive back from server
+        n = read(sockfd,buffer,255);
+        if(n < 0)
+        {
+            cout << "ERROR reading from socket" << endl;
+        }
+        
+        //printf("%s\n", buffer);
+        
+        //format the returned string
+        string anotherTemp(buffer);
+        
+        if(anotherTemp.compare("-1 -1") == 0) //if the major is missing
+        {
+            cout << "The major is not in the table" << endl << endl;
+            continue;
+        }
+
+        string earlyPay = "", midPay = "";
+        
+        
+        int j = 0;
+        
+        //early pay will be everything up to the first space
+        while(anotherTemp[j] != 32)
+        {
+            earlyPay = earlyPay + anotherTemp[j];
+            
+            j++;
+        }
+
+        //mid pay will be everything remaining that isnt a space
+        for(int k = j; k < anotherTemp.size(); k++)
+        {
+            if(anotherTemp[k] == 32)
+            {
+                continue;
+            }
+            midPay = midPay + anotherTemp[k];
+        }
+        
+        cout << "The average early career pay for " << majorInformation << " is $" << earlyPay << endl;
+        cout << "The corresponding mid-career pay is $" << midPay << endl << endl;
+  
+    }
+ 
+    return 0;
+}
